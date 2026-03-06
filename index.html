@@ -2,62 +2,69 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>YAHYA SAT-TRACKER 🛰️</title>
+    <title>YAHYA LIVE SAT-TRACKER 🛰️</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; margin: 0; text-align: center; }
-        #map { height: 70vh; width: 100%; border-bottom: 2px solid #0f0; }
-        .info-panel { padding: 20px; background: #111; border-top: 1px solid #0f0; }
-        .sat-list { display: flex; overflow-x: auto; gap: 15px; padding: 10px; }
-        .sat-card { border: 1px solid #0f0; padding: 10px; min-width: 150px; border-radius: 8px; }
-        .signal-bar { height: 5px; background: #333; margin-top: 5px; }
-        .signal-fill { height: 100%; background: #0f0; transition: 0.5s; }
+        body { background: #000; color: #0f0; font-family: monospace; margin: 0; overflow: hidden; }
+        #map { height: 100vh; width: 100%; }
+        .overlay { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid #0f0; z-index: 1000; pointer-events: none; }
+        .status { color: #58a6ff; }
     </style>
 </head>
 <body>
 
-    <h1>📡 نظام يحيى لتتبع الأقمار الصناعية</h1>
-    <div id="map"></div>
-
-    <div class="info-panel">
-        <h3>🛰️ الأقمار المكتشفة حالياً:</h3>
-        <div class="sat-list" id="satList">
-            </div>
+    <div class="overlay">
+        <h2>📡 رادار يحيى الحي</h2>
+        <div id="sat-info">جاري الاتصال بقاعدة بيانات NORAD...</div>
+        <p class="status">● تحديث حي كل 5 ثوانٍ</p>
     </div>
+
+    <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        // إعداد الخريطة بشكل "ليلي" لتناسب جو الفضاء
-        var map = L.map('map').setView([33.5731, -7.5898], 2); // يبدأ من المغرب العربي
+        // إعداد الخريطة
+        var map = L.map('map').setView([20, 0], 2);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // محاكاة بيانات الأقمار الصناعية (الأسماء وقوة الإشارة)
-        const satellites = [
-            { name: "ISS (المحطة الدولية)", lat: 45, lng: -10, signal: 95 },
-            { name: "Starlink-1042", lat: 20, lng: 30, signal: 78 },
-            { name: "NOAA 19", lat: -10, lng: 50, signal: 60 },
-            { name: "Arabsat-6A", lat: 24, lng: 45, signal: 88 },
-            { name: "Hubble Telescope", lat: 0, lng: 0, signal: 40 }
-        ];
-
-        const listContainer = document.getElementById('satList');
-
-        satellites.forEach(sat => {
-            // إضافة علامة على الخريطة
-            L.marker([sat.lat, sat.lng]).addTo(map).bindPopup(sat.name);
-
-            // إضافة بطاقة معلومات أسفل الخريطة
-            const card = document.createElement('div');
-            card.className = 'sat-card';
-            card.innerHTML = `
-                <strong>${sat.name}</strong>
-                <div class="signal-bar">
-                    <div class="signal-fill" style="width: ${sat.signal}%"></div>
-                </div>
-                <small>قوة الإشارة: ${sat.signal}%</small>
-            `;
-            listContainer.appendChild(card);
+        // أيقونة القمر الصناعي
+        var satIcon = L.icon({
+            iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/International_Space_Station.svg',
+            iconSize: [40, 40]
         });
+
+        var marker = L.marker([0, 0], {icon: satIcon}).addTo(map);
+
+        // وظيفة جلب البيانات الحقيقية لمحطة الفضاء الدولية (ISS) كمثال حي
+        async function updateSatellite() {
+            try {
+                // استدعاء API حقيقي (Open Notify) لجلب موقع ISS من ناسا/نوراد
+                const response = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
+                const data = await response.json();
+                
+                const { latitude, longitude, velocity, altitude } = data;
+
+                // تحديث مكان القمر على الخريطة
+                marker.setLatLng([latitude, longitude]);
+                map.panTo([latitude, longitude]);
+
+                // تحديث لوحة المعلومات
+                document.getElementById('sat-info').innerHTML = `
+                    <strong>الاسم:</strong> ISS (محطة الفضاء)<br>
+                    <strong>خط العرض:</strong> ${latitude.toFixed(4)}<br>
+                    <strong>خط الطول:</strong> ${longitude.toFixed(4)}<br>
+                    <strong>السرعة:</strong> ${velocity.toFixed(2)} كم/س<br>
+                    <strong>الارتفاع:</strong> ${altitude.toFixed(2)} كم
+                `;
+            } catch (error) {
+                document.getElementById('sat-info').innerText = "خطأ في جلب البيانات الحية.";
+            }
+        }
+
+        // تحديث الموقع كل 5 ثوانٍ
+        setInterval(updateSatellite, 5000);
+        updateSatellite();
     </script>
 </body>
 </html>
+
